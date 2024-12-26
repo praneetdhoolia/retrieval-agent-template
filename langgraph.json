@@ -1,0 +1,11 @@
+{
+  "name": "RAG Solution Template",
+  "version": "1.0.0",
+  "dependencies": ["."],
+  "dockerfile_lines": ["RUN pip install playwright", "RUN python -m playwright install", "RUN python -m playwright install-deps"],
+  "graphs": {
+    "indexer": "./src/retrieval_graph/index_graph.py:graph",
+    "retrieval_graph": "./src/retrieval_graph/graph.py:graph"
+  },
+  "env": ".env"
+}
