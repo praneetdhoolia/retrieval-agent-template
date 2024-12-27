@@ -1,4 +1,5 @@
 """This "graph" simply exposes an endpoint for a user to upload docs to be indexed."""
+import json
 
 from typing import Optional, Sequence
 
@@ -12,6 +13,9 @@ from retrieval_graph import retrieval
 from retrieval_graph.crawler import WebCrawler
 from retrieval_graph.configuration import IndexConfiguration
 from retrieval_graph.state import IndexState
+
+from langchain_community.utilities import ApifyWrapper
+from langchain_community.document_loaders import ApifyDatasetLoader
 
 
 def ensure_docs_have_user_id(
@@ -46,6 +50,32 @@ async def crawl(tenant: str, starter_urls: list, hops: int):
         for page in crawler.crawled_pages
     ]
 
+def apify_crawl(tenant: str, starter_urls: list, hops: int):
+    site_dataset_map = load_site_dataset_map()
+    if dataset_id := site_dataset_map.get(tenant):
+        loader = ApifyDatasetLoader(
+            dataset_id=dataset_id,
+            dataset_mapping_function=lambda item: Document(
+                page_content=item["html"] or "", metadata={"url": item["url"]}
+            ),
+        )
+    else:
+        apify = ApifyWrapper()
+        loader = apify.call_actor(
+            actor_id="apify/website-content-crawler",
+            run_input={
+                "startUrls": [{"url": "https://zohlar.com"}],
+                "saveHtml": True,
+                "htmlTransformer": "none"
+            },
+            dataset_mapping_function=lambda item: Document(
+                page_content=item["html"] or "", metadata={"url": item["url"]}
+            ),
+        )
+        print(f"Site: {tenant} crawled and loaded into Apify dataset: {loader.dataset_id}")
+
+    return loader.load()
+
 async def index_docs(
     state: IndexState, *, config: Optional[RunnableConfig] = None
 ) -> dict[str, str]:
@@ -66,9 +96,9 @@ async def index_docs(
         configuration = IndexConfiguration.from_runnable_config(config)
         if not state.docs and configuration.starter_urls:
             print(f"starting crawl ...")
-            state.docs = await crawl (
+            state.docs = apify_crawl (
                 configuration.user_id,
-                configuration.parse_starter_urls(),
+                [{"url": url} for url in configuration.parse_starter_urls()],
                 configuration.hops
             )
         stamped_docs = ensure_docs_have_user_id(state.docs, config)
@@ -78,9 +108,9 @@ async def index_docs(
             await retriever.aadd_documents(stamped_docs)
     return {"docs": "delete"}
 
-
-# Define a new graph
-
+def load_site_dataset_map() -> dict:
+    with open("sites_dataset_map.json", 'r', encoding='utf-8') as file:
+        return json.load(file)
 
 builder = StateGraph(IndexState, config_schema=IndexConfiguration)
 builder.add_node(index_docs)
