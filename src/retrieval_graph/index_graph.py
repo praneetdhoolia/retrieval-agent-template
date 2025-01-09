@@ -64,7 +64,7 @@ def apify_crawl(tenant: str, starter_urls: list, hops: int):
         loader = apify.call_actor(
             actor_id="apify/website-content-crawler",
             run_input={
-                "startUrls": [{"url": "https://zohlar.com"}],
+                "startUrls": starter_urls,
                 "saveHtml": True,
                 "htmlTransformer": "none"
             },
