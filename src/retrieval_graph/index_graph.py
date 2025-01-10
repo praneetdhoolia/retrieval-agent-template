@@ -57,7 +57,7 @@ def apify_crawl(tenant: str, starter_urls: list, hops: int):
         loader = ApifyDatasetLoader(
             dataset_id=dataset_id,
             dataset_mapping_function=lambda item: Document(
-                page_content=item["html"] or "", metadata={"url": item["url"]}
+                page_content=item.get('html') or item.get('text') or "", metadata={"url": item["url"]}
             ),
         )
     else:
