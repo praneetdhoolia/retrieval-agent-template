@@ -1,4 +1,5 @@
 """This "graph" simply exposes an endpoint for a user to upload docs to be indexed."""
+import os
 import json
 
 from typing import Optional, Sequence
@@ -65,11 +66,11 @@ def apify_crawl(tenant: str, starter_urls: list, hops: int):
             actor_id="apify/website-content-crawler",
             run_input={
                 "startUrls": starter_urls,
-                "saveHtml": True,
-                "htmlTransformer": "none"
+                # "saveHtml": True,
+                # "htmlTransformer": "none"
             },
             dataset_mapping_function=lambda item: Document(
-                page_content=item["html"] or "", metadata={"url": item["url"]}
+                page_content=item["text"] or "", metadata={"url": item["url"]}
             ),
         )
         print(f"Site: {tenant} crawled and loaded into Apify dataset: {loader.dataset_id}")
@@ -109,8 +110,10 @@ async def index_docs(
     return {"docs": "delete"}
 
 def load_site_dataset_map() -> dict:
-    with open("sites_dataset_map.json", 'r', encoding='utf-8') as file:
-        return json.load(file)
+    site_dataset_map = os.getenv("SITE_DATASET_MAP")
+    if not site_dataset_map:
+        return {}
+    return json.loads(site_dataset_map)
 
 builder = StateGraph(IndexState, config_schema=IndexConfiguration)
 builder.add_node(index_docs)
