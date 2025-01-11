@@ -106,15 +106,16 @@ def make_mongodb_retriever(
 
 @contextmanager
 def make_milvus_retriever(
-    configuration: IndexConfiguration, embedding_model: Embeddings
+    configuration: IndexConfiguration, embedding_model: Embeddings, **kwargs
 ) -> Generator[VectorStoreRetriever, None, None]:
     """Configure this agent to use milvus lite file based uri to store the vector index."""
     from langchain_milvus.vectorstores import Milvus
 
+    milvus_uri = kwargs.get("alternate_milvus_uri", os.environ.get("MILVUS_DB"))
     vstore = Milvus (
         embedding_function=embedding_model,
         collection_name=configuration.user_id,
-        connection_args={"uri": os.environ["MILVUS_DB"]},
+        connection_args={"uri": milvus_uri},
         auto_id=True
     )
     yield vstore.as_retriever()
@@ -123,6 +124,7 @@ def make_milvus_retriever(
 @contextmanager
 def make_retriever(
     config: RunnableConfig,
+    **kwargs,
 ) -> Generator[VectorStoreRetriever, None, None]:
     """Create a retriever for the agent, based on the current configuration."""
     configuration = IndexConfiguration.from_runnable_config(config)
@@ -144,7 +146,7 @@ def make_retriever(
                 yield retriever
 
         case "milvus":
-            with make_milvus_retriever(configuration, embedding_model) as retriever:
+            with make_milvus_retriever(configuration, embedding_model, **kwargs) as retriever:
                 yield retriever
 
         case _:

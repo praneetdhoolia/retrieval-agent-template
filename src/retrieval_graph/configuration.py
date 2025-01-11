@@ -11,11 +11,11 @@ from retrieval_graph import prompts
 
 
 @dataclass(kw_only=True)
-class IndexConfiguration:
+class CommonConfiguration:
     """Configuration class for indexing and retrieval operations.
 
-    This class defines the parameters needed for configuring the indexing and
-    retrieval processes, including user identification, embedding model selection,
+    This class defines the parameters needed for both configuring the index and
+    retrieval processes, including tenant identification, embedding model selection,
     retriever provider choice, and search parameters.
     """
 
@@ -48,8 +48,32 @@ class IndexConfiguration:
         },
     )
 
+    @classmethod
+    def from_runnable_config(
+        cls: Type[T], config: Optional[RunnableConfig] = None
+    ) -> T:
+        """Create a CommonConfiguration instance from a RunnableConfig object.
+
+        Args:
+            cls (Type[T]): The class itself.
+            config (Optional[RunnableConfig]): The configuration object to use.
+
+        Returns:
+            T: An instance of CommonConfiguration with the specified configuration.
+        """
+        config = ensure_config(config)
+        configurable = config.get("configurable") or {}
+        _fields = {f.name for f in fields(cls) if f.init}
+        return cls(**{k: v for k, v in configurable.items() if k in _fields})
+    
+T = TypeVar("T", bound=CommonConfiguration)
+
+@dataclass(kw_only=True)
+class IndexConfiguration(CommonConfiguration):
+    """Crawler configuration class for indexing operations."""
+
     starter_urls: str = field(
-        default="https://zohlar.com",
+        default="",
         metadata={
             "description": "Comma-separated string of starter URLs to crawl for indexing web pages."
         },
@@ -59,26 +83,22 @@ class IndexConfiguration:
         default=2,
         metadata={
             "description": "Maximum number of hops to traverse pages linked to the starter URLs."
-        },
+        }, 
     )
 
-    @classmethod
-    def from_runnable_config(
-        cls: Type[T], config: Optional[RunnableConfig] = None
-    ) -> T:
-        """Create an IndexConfiguration instance from a RunnableConfig object.
-
-        Args:
-            cls (Type[T]): The class itself.
-            config (Optional[RunnableConfig]): The configuration object to use.
-
-        Returns:
-            T: An instance of IndexConfiguration with the specified configuration.
-        """
-        config = ensure_config(config)
-        configurable = config.get("configurable") or {}
-        _fields = {f.name for f in fields(cls) if f.init}
-        return cls(**{k: v for k, v in configurable.items() if k in _fields})
+    batch_size: int = field(
+        default=50,
+        metadata={
+            "description": "Number of documents to index in a single batch."
+        },
+    )
+    
+    apify_dataset_id: str = field(
+        default="",
+        metadata={
+            "description": "The Apify dataset ID to use if already crawled and stored on Apify."
+        },
+    )
 
     def parse_starter_urls(self) -> list[str]:
         """Parse the starter URLs into a list.
@@ -88,13 +108,17 @@ class IndexConfiguration:
         """
         return [url.strip() for url in self.starter_urls.split(",") if url.strip()]
 
-
-T = TypeVar("T", bound=IndexConfiguration)
-
-
 @dataclass(kw_only=True)
-class Configuration(IndexConfiguration):
+class Configuration(CommonConfiguration):
     """The configuration for the agent."""
+
+    # optional: index location
+    alternate_milvus_uri: Optional[str] = field(
+        default="",
+        metadata={
+            "description": "If you want to use one of the already available indexes, provide the file location here."
+        },
+    )
 
     response_system_prompt: str = field(
         default=prompts.RESPONSE_SYSTEM_PROMPT,

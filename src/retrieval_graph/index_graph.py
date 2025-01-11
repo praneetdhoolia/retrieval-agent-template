@@ -1,23 +1,19 @@
 """This "graph" simply exposes an endpoint for a user to upload docs to be indexed."""
 import os
 import json
-
+import time
 from typing import Optional, Sequence
-
+from langchain_community.utilities import ApifyWrapper
+from langchain_community.document_loaders import ApifyDatasetLoader
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
-
 from urllib.parse import urlparse
 
 from retrieval_graph import retrieval
 from retrieval_graph.crawler import WebCrawler
 from retrieval_graph.configuration import IndexConfiguration
 from retrieval_graph.state import IndexState
-
-from langchain_community.utilities import ApifyWrapper
-from langchain_community.document_loaders import ApifyDatasetLoader
-
 
 def ensure_docs_have_user_id(
     docs: Sequence[Document], config: RunnableConfig
@@ -51,9 +47,12 @@ async def crawl(tenant: str, starter_urls: list, hops: int):
         for page in crawler.crawled_pages
     ]
 
-def apify_crawl(tenant: str, starter_urls: list, hops: int):
-    site_dataset_map = load_site_dataset_map()
-    if dataset_id := site_dataset_map.get(tenant):
+def apify_crawl(configuration: IndexConfiguration):
+    tenant = configuration.user_id
+    starter_urls = [{"url": url} for url in configuration.parse_starter_urls()]
+    dataset_id = configuration.apify_dataset_id
+
+    if dataset_id:
         loader = ApifyDatasetLoader(
             dataset_id=dataset_id,
             dataset_mapping_function=lambda item: Document(
@@ -77,6 +76,11 @@ def apify_crawl(tenant: str, starter_urls: list, hops: int):
 
     return loader.load()
 
+def chunk_documents(docs, batch_size):
+    """Chunk documents into smaller batches."""
+    for i in range(0, len(docs), batch_size):
+        yield docs[i:i + batch_size]
+
 async def index_docs(
     state: IndexState, *, config: Optional[RunnableConfig] = None
 ) -> dict[str, str]:
@@ -97,23 +101,18 @@ async def index_docs(
         configuration = IndexConfiguration.from_runnable_config(config)
         if not state.docs and configuration.starter_urls:
             print(f"starting crawl ...")
-            state.docs = apify_crawl (
-                configuration.user_id,
-                [{"url": url} for url in configuration.parse_starter_urls()],
-                configuration.hops
-            )
+            state.docs = apify_crawl (configuration)
         stamped_docs = ensure_docs_have_user_id(state.docs, config)
-        if configuration.retriever_provider == "milvus":
-            retriever.add_documents(stamped_docs)
-        else:
-            await retriever.aadd_documents(stamped_docs)
+        batch_size = configuration.batch_size
+        for i, batch in enumerate(chunk_documents(stamped_docs, batch_size)):
+            if configuration.retriever_provider == "milvus":
+                retriever.add_documents(batch)
+            else:
+                await retriever.aadd_documents(batch)
+            # Sleep only if there are more batches to process
+            if i < (len(stamped_docs) // batch_size):
+                time.sleep(60)
     return {"docs": "delete"}
-
-def load_site_dataset_map() -> dict:
-    site_dataset_map = os.getenv("SITE_DATASET_MAP")
-    if not site_dataset_map:
-        return {}
-    return json.loads(site_dataset_map)
 
 builder = StateGraph(IndexState, config_schema=IndexConfiguration)
 builder.add_node(index_docs)
