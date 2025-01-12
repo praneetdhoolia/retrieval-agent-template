@@ -111,7 +111,7 @@ def make_milvus_retriever(
     """Configure this agent to use milvus lite file based uri to store the vector index."""
     from langchain_milvus.vectorstores import Milvus
 
-    milvus_uri = kwargs.get("alternate_milvus_uri", os.environ.get("MILVUS_DB"))
+    milvus_uri = kwargs.get("alternate_milvus_uri") or os.environ.get("MILVUS_DB")
     vstore = Milvus (
         embedding_function=embedding_model,
         collection_name=configuration.user_id,
