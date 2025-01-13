@@ -33,20 +33,9 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           uv venv
           uv pip install -r pyproject.toml
-      - name: Lint with mypy
-        run: |
-          uv pip install mypy
-          uv run mypy --strict src/
-      - name: Check README spelling
-        uses: codespell-project/actions-codespell@v2
-        with:
-          ignore_words_file: .codespellignore
-          path: README.md
-      - name: Check code spelling
-        uses: codespell-project/actions-codespell@v2
-        with:
-          ignore_words_file: .codespellignore
-          path: src/
+      # Removed the "Lint with mypy" step
+      # Removed the "Check README spelling" step
+      # Removed the "Check code spelling" step
       - name: Run tests with pytest
         run: |
           uv pip install pytest

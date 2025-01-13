@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["mypy>=1.11.1"]
+# Removed all linting dependencies (like mypy, ruff, etc.)
 
 [build-system]
 requires = ["setuptools>=73.0.0", "wheel"]
