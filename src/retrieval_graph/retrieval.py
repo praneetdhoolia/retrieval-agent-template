@@ -112,10 +112,15 @@ def make_milvus_retriever(
     from langchain_milvus.vectorstores import Milvus
 
     milvus_uri = kwargs.get("alternate_milvus_uri") or os.environ.get("MILVUS_DB")
-    vstore = Milvus (
+    vstore = Milvus(
         embedding_function=embedding_model,
         collection_name=configuration.user_id,
         connection_args={"uri": milvus_uri},
+        index_params={
+            "index_type": "FLAT",  # Only FLAT is supported in local mode
+            "metric_type": "L2",
+            "params": {}
+        },
         auto_id=True
     )
     yield vstore.as_retriever()
