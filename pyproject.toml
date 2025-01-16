@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Starter template for making a custom retrieval graph in LangGraph."
 authors = [
     { name = "William Fu-Hinthorn", email = "13333726+hinthornw@users.noreply.github.com" },
+    { name = "Praneet Dhoolia", email = "praneet.dhoolia@gmail.com" },
 ]
 license = { text = "MIT" }
 readme = "README.md"
