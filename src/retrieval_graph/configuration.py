@@ -49,7 +49,7 @@ class CommonConfiguration:
     )
 
     collection_name: str = field(
-        default="jira_issues",
+        default="docs",
         metadata={"description": "Collection/Index name to store Jira issues."},
     )
 
