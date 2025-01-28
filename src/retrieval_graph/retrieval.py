@@ -116,7 +116,8 @@ def make_milvus_retriever(
         embedding_function=embedding_model,
         collection_name=configuration.user_id,
         connection_args={"uri": milvus_uri},
-        auto_id=True
+        auto_id=True,
+        index_params={"index_type": "FLAT"}
     )
     yield vstore.as_retriever(search_kwargs=configuration.search_kwargs)
 
