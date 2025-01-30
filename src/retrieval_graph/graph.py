@@ -30,6 +30,42 @@ class SearchQuery(BaseModel):
     query: str
 
 
+class Intent(BaseModel):
+    """Is the user's question relevant for the intent"""
+    relevant: bool
+
+
+async def intent_guardrail(state, config):
+    configuration = Configuration.from_runnable_config(config)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", configuration.intent_system_prompt),
+            ("placeholder", "{messages}"),
+        ]
+    )
+    model = load_chat_model(configuration.intent_model).with_structured_output(Intent)
+
+    message_value = await prompt.ainvoke(
+        {
+            "messages": state.messages,
+            "intent_description": configuration.intent_description,
+            "system_time": datetime.now(tz=timezone.utc).isoformat(),
+        },
+        config,
+    )
+    generated = cast(Intent, await model.ainvoke(message_value, config))
+    return {
+        "relevant": generated.relevant,
+    }
+
+
+def decide_relevance(state: State) -> str:
+    """If not relevant straight go to response"""
+    if not state.relevant:
+        return "respond"
+    return "generate_query"
+
+
 async def generate_query(
     state: State, *, config: RunnableConfig
 ) -> dict[str, list[str]]:
@@ -139,10 +175,22 @@ async def respond(
 
 builder = StateGraph(State, input=InputState, config_schema=Configuration)
 
+builder.add_node(intent_guardrail)
 builder.add_node(generate_query)
 builder.add_node(retrieve)
 builder.add_node(respond)
-builder.add_edge("__start__", "generate_query")
+
+builder.add_edge("__start__", "intent_guardrail")
+
+builder.add_conditional_edges(
+    "intent_guardrail",
+    decide_relevance,
+    {
+        "respond": "respond",
+        "generate_query": "generate_query"
+    }
+)
+
 builder.add_edge("generate_query", "retrieve")
 builder.add_edge("retrieve", "respond")
 
