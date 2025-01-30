@@ -219,6 +219,27 @@ class Configuration(CommonConfiguration):
         },
     )
 
+    intent_description: Optional[str] = field(
+        default="",
+        metadata={
+            "description": "Describe clearly the purpose of the assistant. It will be used to determine the relevance of user's questions."
+        },
+    )
+
+    intent_system_prompt: str = field(
+        default=prompts.INTENT_SYSTEM_PROMPT,
+        metadata={
+            "description": "The system prompt used for intent classification."
+        },
+    )
+
+    intent_model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
+        default="openai/gpt-4o",
+        metadata={
+            "description": "The language model used for intent classification. Should be in the form: provider/model-name."
+        },
+    )
+
     def __post_init__(self):
         # Always ensure "k"=10 if not already set
         self.search_kwargs.setdefault("k", 10)
