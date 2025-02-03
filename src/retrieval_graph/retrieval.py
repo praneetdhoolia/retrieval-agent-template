@@ -110,16 +110,37 @@ def make_milvus_retriever(
 ) -> Generator[VectorStoreRetriever, None, None]:
     """Configure this agent to use milvus lite file based uri to store the vector index."""
     from langchain_milvus.vectorstores import Milvus
-
+    index_params = {
+    "metric_type": "IP",  
+    "index_type": "IVF_FLAT",    
+    "params": {},   
+    }   
     milvus_uri = kwargs.get("alternate_milvus_uri") or os.environ.get("MILVUS_DB")
-    vstore = Milvus (
+    vstore = Milvus(
         embedding_function=embedding_model,
         collection_name=configuration.user_id,
         connection_args={"uri": milvus_uri},
         auto_id=True,
+        index_params={"index_type": "FLAT"}
     )
     yield vstore.as_retriever(search_kwargs=configuration.search_kwargs)
 
+@contextmanager
+def make_chromadb_retriever(
+    configuration: IndexConfiguration, embedding_model: Embeddings
+) -> Generator[VectorStoreRetriever, None, None]:
+    """Configure this agent to connect to a specific ChromaDB index."""
+    from langchain_chroma import Chroma
+
+    vstore = Chroma(
+        collection_name=configuration.collection_name,
+        persist_directory=os.environ.get("CHROMADB_PERSIST_DIR", "indexes/custom.db"),
+        embedding_function=embedding_model,
+    )
+    search_kwargs = configuration.search_kwargs
+    search_filter = search_kwargs.setdefault("filter", {})
+    search_filter.update({"user_id": configuration.user_id})
+    yield vstore.as_retriever(search_kwargs=search_kwargs)
 
 @contextmanager
 def make_retriever(
@@ -149,6 +170,10 @@ def make_retriever(
             with make_milvus_retriever(configuration, embedding_model, **kwargs) as retriever:
                 yield retriever
 
+        case "chromadb":
+            with make_chromadb_retriever(configuration, embedding_model) as retriever:
+                yield retriever
+                
         case _:
             raise ValueError(
                 "Unrecognized retriever_provider in configuration. "

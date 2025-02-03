@@ -38,6 +38,7 @@ def reduce_docs(
         Sequence[str],
         str,
         Literal["delete"],
+        Literal["ingest"],
         Literal["crawl"],
     ],
 ) -> Sequence[Document]:
@@ -53,6 +54,8 @@ def reduce_docs(
             or the literals "delete", or "crawl".
     """
     if new == "crawl":
+        return []
+    if new == "ingest":
         return []
     if new == "delete":
         return []
@@ -159,6 +162,8 @@ class State(InputState):
 
     retrieved_docs: list[Document] = field(default_factory=list)
     """Populated by the retriever. This is a list of documents that the agent can reference."""
+
+    relevant: bool = field(default=True)
 
     # Feel free to add additional attributes to your state as needed.
     # Common examples include retrieved documents, extracted entities, API connections, etc.
